@@ -1,0 +1,58 @@
+services:
+  jenkins:
+    build:
+      context: ./jenkins
+    container_name: myc-jenkins
+    ports:
+      - "8085:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+    networks:
+      - myc-ci
+    restart: unless-stopped
+
+  artifactory:
+    image: releases-docker.jfrog.io/jfrog/artifactory-oss:7.63.14
+    container_name: myc-artifactory
+    environment:
+      EXTRA_JAVA_OPTIONS: -Xms512m -Xmx2g -Xss256k -XX:+UseG1GC
+      JF_ROUTER_ENTRYPOINTS_EXTERNALPORT: 8082
+    ports:
+      - "8081:8081"
+      - "8082:8082"
+    volumes:
+      - artifactory_data:/var/opt/jfrog/artifactory
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 32000
+        hard: 40000
+    networks:
+      - myc-ci
+    restart: unless-stopped
+
+  mariadb:
+    image: mariadb:11.3
+    container_name: myc-mariadb
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-root}
+      MARIADB_DATABASE: my_construction
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./db/mariadb-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - myc-ci
+    restart: unless-stopped
+
+networks:
+  myc-ci:
+    name: myc-ci
+
+volumes:
+  jenkins_home: {}
+  artifactory_data: {}
+  mariadb_data: {}
+
