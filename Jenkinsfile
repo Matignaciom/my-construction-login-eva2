@@ -69,7 +69,8 @@ pipeline {
             error("No se encontró ningún archivo target/*shaded.jar para publicar.")
           }
 
-          String uploadUrl = "${baseUrl.replaceAll('/+$', '')}/${repo}/${targetPath}/"
+          String fileName = jar.replace('\\', '/').tokenize('/').last()
+          String uploadUrl = "${baseUrl.replaceAll('/+$', '')}/${repo}/${targetPath}/${fileName}"
 
           if (env.ARTIFACTORY_TOKEN_CREDENTIALS_ID?.trim()) {
             withCredentials([string(credentialsId: env.ARTIFACTORY_TOKEN_CREDENTIALS_ID, variable: 'AF_TOKEN')]) {
