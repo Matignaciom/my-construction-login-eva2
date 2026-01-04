@@ -53,7 +53,7 @@ pipeline {
           if (isUnix()) {
             jar = sh(script: "ls -1 target/*shaded.jar | head -n 1", returnStdout: true).trim()
           } else {
-            jar = bat(script: "@for %%f in (target\\*shaded.jar) do @echo %%f & goto :done\r\n:done", returnStdout: true).trim()
+            jar = powershell(script: "(Get-ChildItem -Path 'target' -Filter '*shaded.jar' | Select-Object -First 1 -ExpandProperty FullName)", returnStdout: true).trim()
           }
 
           if (!jar) {
