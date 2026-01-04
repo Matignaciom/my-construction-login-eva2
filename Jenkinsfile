@@ -7,7 +7,8 @@ pipeline {
 
   environment {
     MVN_CMD = 'mvn -B -ntp'
-    ARTIFACTORY_URL_DEFAULT = 'http://artifactory:8082/artifactory'
+    ARTIFACTORY_URL_DOCKER_DEFAULT = 'http://artifactory:8082/artifactory'
+    ARTIFACTORY_URL_WINDOWS_DEFAULT = 'http://localhost:8082/artifactory'
     ARTIFACTORY_REPO_DEFAULT = 'libs-release-local'
     ARTIFACTORY_TARGET_PATH_DEFAULT = 'cl/myconstruction/my-construction-login'
   }
@@ -35,7 +36,7 @@ pipeline {
     stage('Publish to Artifactory') {
       when {
         expression {
-          String url = (env.ARTIFACTORY_URL?.trim()) ? env.ARTIFACTORY_URL.trim() : env.ARTIFACTORY_URL_DEFAULT
+          String url = (env.ARTIFACTORY_URL?.trim()) ? env.ARTIFACTORY_URL.trim() : (isUnix() ? env.ARTIFACTORY_URL_DOCKER_DEFAULT : env.ARTIFACTORY_URL_WINDOWS_DEFAULT)
           boolean hasUrl = url?.trim()
           boolean hasToken = env.ARTIFACTORY_TOKEN?.trim() || env.ARTIFACTORY_TOKEN_CREDENTIALS_ID?.trim()
           boolean hasUserPass = (env.ARTIFACTORY_USER?.trim() && env.ARTIFACTORY_PASSWORD?.trim()) || env.ARTIFACTORY_CREDENTIALS_ID?.trim()
@@ -44,7 +45,7 @@ pipeline {
       }
       steps {
         script {
-          String baseUrl = (env.ARTIFACTORY_URL?.trim()) ? env.ARTIFACTORY_URL.trim() : env.ARTIFACTORY_URL_DEFAULT
+          String baseUrl = (env.ARTIFACTORY_URL?.trim()) ? env.ARTIFACTORY_URL.trim() : (isUnix() ? env.ARTIFACTORY_URL_DOCKER_DEFAULT : env.ARTIFACTORY_URL_WINDOWS_DEFAULT)
           String repo = (env.ARTIFACTORY_REPO?.trim()) ? env.ARTIFACTORY_REPO.trim() : env.ARTIFACTORY_REPO_DEFAULT
           String targetPathBase = (env.ARTIFACTORY_TARGET_PATH?.trim()) ? env.ARTIFACTORY_TARGET_PATH.trim() : env.ARTIFACTORY_TARGET_PATH_DEFAULT
           String targetPath = "${targetPathBase}/${env.BUILD_NUMBER ?: 'local'}"
