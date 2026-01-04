@@ -1,10 +1,15 @@
 pipeline {
   agent any
 
+  options {
+    skipDefaultCheckout()
+  }
+
   environment {
     MVN_CMD = 'mvn -B -ntp'
-    ARTIFACTORY_SERVER_ID = 'artifactory-server'
-    ARTIFACTORY_REPO = 'libs-release-local'
+    ARTIFACTORY_URL_DEFAULT = 'http://artifactory:8082/artifactory'
+    ARTIFACTORY_REPO_DEFAULT = 'libs-release-local'
+    ARTIFACTORY_TARGET_PATH_DEFAULT = 'cl/myconstruction/my-construction-login'
   }
 
   stages {
@@ -30,31 +35,70 @@ pipeline {
     stage('Publish to Artifactory') {
       when {
         expression {
-          return env.ARTIFACTORY_SERVER_ID?.trim() &&
-                 env.ARTIFACTORY_URL?.trim() &&
-                 env.ARTIFACTORY_CREDENTIALS_ID?.trim()
+          String url = (env.ARTIFACTORY_URL?.trim()) ? env.ARTIFACTORY_URL.trim() : env.ARTIFACTORY_URL_DEFAULT
+          boolean hasUrl = url?.trim()
+          boolean hasToken = env.ARTIFACTORY_TOKEN?.trim() || env.ARTIFACTORY_TOKEN_CREDENTIALS_ID?.trim()
+          boolean hasUserPass = (env.ARTIFACTORY_USER?.trim() && env.ARTIFACTORY_PASSWORD?.trim()) || env.ARTIFACTORY_CREDENTIALS_ID?.trim()
+          return hasUrl && (hasToken || hasUserPass)
         }
       }
       steps {
-        rtServer (
-          id: "${ARTIFACTORY_SERVER_ID}",
-          url: "${ARTIFACTORY_URL}",
-          credentialsId: "${ARTIFACTORY_CREDENTIALS_ID}"
-        )
+        script {
+          String baseUrl = (env.ARTIFACTORY_URL?.trim()) ? env.ARTIFACTORY_URL.trim() : env.ARTIFACTORY_URL_DEFAULT
+          String repo = (env.ARTIFACTORY_REPO?.trim()) ? env.ARTIFACTORY_REPO.trim() : env.ARTIFACTORY_REPO_DEFAULT
+          String targetPathBase = (env.ARTIFACTORY_TARGET_PATH?.trim()) ? env.ARTIFACTORY_TARGET_PATH.trim() : env.ARTIFACTORY_TARGET_PATH_DEFAULT
+          String targetPath = "${targetPathBase}/${env.BUILD_NUMBER ?: 'local'}"
 
-        rtUpload (
-          serverId: "${ARTIFACTORY_SERVER_ID}",
-          spec: """{
-            "files": [
-              {
-                "pattern": "target/*shaded.jar",
-                "target": "${ARTIFACTORY_REPO}/cl/myconstruction/my-construction-login/${BUILD_NUMBER}/"
+          String jar
+          if (isUnix()) {
+            jar = sh(script: "ls -1 target/*shaded.jar | head -n 1", returnStdout: true).trim()
+          } else {
+            jar = bat(script: "@for %%f in (target\\*shaded.jar) do @echo %%f & goto :done\r\n:done", returnStdout: true).trim()
+          }
+
+          if (!jar) {
+            error("No se encontró ningún archivo target/*shaded.jar para publicar.")
+          }
+
+          String uploadUrl = "${baseUrl.replaceAll('/+$', '')}/${repo}/${targetPath}/"
+
+          if (env.ARTIFACTORY_TOKEN_CREDENTIALS_ID?.trim()) {
+            withCredentials([string(credentialsId: env.ARTIFACTORY_TOKEN_CREDENTIALS_ID, variable: 'AF_TOKEN')]) {
+              if (isUnix()) {
+                sh "curl --fail --show-error --silent -H \"Authorization: Bearer $AF_TOKEN\" -T \"${jar}\" \"${uploadUrl}\""
+              } else {
+                bat "curl --fail --show-error --silent -H \"Authorization: Bearer %AF_TOKEN%\" -T \"${jar}\" \"${uploadUrl}\""
               }
-            ]
-          }"""
-        )
+            }
+            return
+          }
 
-        rtPublishBuildInfo (serverId: "${ARTIFACTORY_SERVER_ID}")
+          if (env.ARTIFACTORY_TOKEN?.trim()) {
+            if (isUnix()) {
+              sh "curl --fail --show-error --silent -H \"Authorization: Bearer ${env.ARTIFACTORY_TOKEN}\" -T \"${jar}\" \"${uploadUrl}\""
+            } else {
+              bat "curl --fail --show-error --silent -H \"Authorization: Bearer %ARTIFACTORY_TOKEN%\" -T \"${jar}\" \"${uploadUrl}\""
+            }
+            return
+          }
+
+          if (env.ARTIFACTORY_USER?.trim() && env.ARTIFACTORY_PASSWORD?.trim()) {
+            if (isUnix()) {
+              sh "curl --fail --show-error --silent -u \"${env.ARTIFACTORY_USER}:${env.ARTIFACTORY_PASSWORD}\" -T \"${jar}\" \"${uploadUrl}\""
+            } else {
+              bat "curl --fail --show-error --silent -u \"%ARTIFACTORY_USER%:%ARTIFACTORY_PASSWORD%\" -T \"${jar}\" \"${uploadUrl}\""
+            }
+            return
+          }
+
+          withCredentials([usernamePassword(credentialsId: env.ARTIFACTORY_CREDENTIALS_ID, usernameVariable: 'AF_USER', passwordVariable: 'AF_PASS')]) {
+            if (isUnix()) {
+              sh "curl --fail --show-error --silent -u \"$AF_USER:$AF_PASS\" -T \"${jar}\" \"${uploadUrl}\""
+            } else {
+              bat "curl --fail --show-error --silent -u \"%AF_USER%:%AF_PASS%\" -T \"${jar}\" \"${uploadUrl}\""
+            }
+          }
+        }
       }
     }
   }
