@@ -51,9 +51,12 @@ pipeline {
 
           String jar
           if (isUnix()) {
-            jar = sh(script: "ls -1 target/*shaded.jar | head -n 1", returnStdout: true).trim()
+            jar = sh(script: "ls -1 target/*shaded.jar 2>/dev/null | head -n 1", returnStdout: true).trim()
+            if (!jar) {
+              jar = sh(script: "ls -1 target/*.jar 2>/dev/null | grep -v '^target/original-' | head -n 1", returnStdout: true).trim()
+            }
           } else {
-            jar = bat(script: "@echo off\r\nfor /f \"delims=\" %%f in ('dir /b target\\*shaded.jar 2^>nul') do (echo target\\%%f & exit /b 0)\r\necho.\r\n", returnStdout: true).trim()
+            jar = bat(script: "@echo off\r\nfor /f \"delims=\" %%f in ('dir /b target\\*shaded.jar 2^>nul') do (echo target\\%%f & exit /b 0)\r\nfor /f \"delims=\" %%f in ('dir /b target\\*.jar 2^>nul ^| findstr /v /i \"^original-\"') do (echo target\\%%f & exit /b 0)\r\necho.\r\n", returnStdout: true).trim()
           }
 
           if (!jar) {
