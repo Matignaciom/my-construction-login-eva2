@@ -9,7 +9,7 @@ pipeline {
     MVN_CMD = 'mvn -B -ntp'
     ARTIFACTORY_URL_DOCKER_DEFAULT = 'http://artifactory:8082/artifactory'
     ARTIFACTORY_URL_WINDOWS_DEFAULT = 'http://localhost:8082/artifactory'
-    ARTIFACTORY_REPO_DEFAULT = 'libs-release-local'
+    ARTIFACTORY_REPO_DEFAULT = 'example-repo-local'
     ARTIFACTORY_TARGET_PATH_DEFAULT = 'cl/myconstruction/my-construction-login'
   }
 
