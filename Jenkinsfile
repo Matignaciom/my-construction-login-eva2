@@ -53,10 +53,15 @@ pipeline {
           if (isUnix()) {
             jar = sh(script: "ls -1 target/*shaded.jar | head -n 1", returnStdout: true).trim()
           } else {
-            jar = powershell(script: "(Get-ChildItem -Path 'target' -Filter '*shaded.jar' | Select-Object -First 1 -ExpandProperty FullName)", returnStdout: true).trim()
+            jar = bat(script: "@echo off\r\nfor /f \"delims=\" %%f in ('dir /b target\\*shaded.jar 2^>nul') do (echo target\\%%f & exit /b 0)\r\necho.\r\n", returnStdout: true).trim()
           }
 
           if (!jar) {
+            if (isUnix()) {
+              sh "ls -la target || true"
+            } else {
+              bat "dir target"
+            }
             error("No se encontró ningún archivo target/*shaded.jar para publicar.")
           }
 
